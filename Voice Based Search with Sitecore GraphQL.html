@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Voice Based Search with Sitecore GraphQL</title>
+  <link rel="stylesheet" href="css/bootstrap-themed.min.css" />
+  <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+</head>
+
+<body style="background-color: white;">
+
+  <div id="warning">
+    <h1 style="font-weight:500;">There is some error in Page</h1>
+  </div>
+
+  <header>
+    <div class="container">
+      <div class="jumbotron text-white bg-primary">
+        <h1 class="display-4">Voice Based Search with Sitecore GraphQL</h1>
+
+        <div class="lead">Insane combination of Speech Technology with Sitecore GraphQL.</div>
+
+      </div>
+    </div>
+  </header>
+
+
+  <div class="container tags-topics">
+    <div id="accordion">
+      <div class="card bg-light">
+        <!-- If showing a filtered result, add a class of "active" to this button -->
+        <button class="btn btn-info btn-lg btn-block active" data-toggle="collapse" data-target="#collapseOne"
+          aria-expanded="true" aria-controls="collapseOne">
+          Tags, Topics & Archive
+        </button>
+        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+        <span class="glyphicon glyphicon-th" aria-hidden="true"></span>
+
+      </div>
+    </div>
+  </div>
+
+  <aside role="aside" class="container blog-post-read-more">
+
+    <br>
+
+    <div id="content" class="col-6">
+      <div class="form-group row">
+        <label for="Search" class="col-sm-4 col-form-label">Speak for Search</label>
+        <div class="col-sm-8">
+
+          <input type="text" class="form-control" id="phraseDiv" placeholder="Speak for Search"
+            style="width: calc(100% - 30px);float: left;" />
+          <button id="speechsdkStartRecognizeOnceAsync" style="background-color:#fff; border: none; height: 37px;">
+            <img style="width:15px;height:24px" src="./images/mic.png" /></button>
+        </div>
+      </div>
+      <div class="form-group row"><label for="Search" class="col-sm-4 col-form-label">
+        </label></div>
+    </div>
+    </div>
+    <br>
+
+    <div id="resultDiv11"></div>
+    </div>
+  </aside>
+
+
+  <!-- Speech SDK REFERENCE -->
+  <script src="microsoft.cognitiveservices.speech.sdk.bundle.js"></script>
+
+  <!-- Speech SDK USAGE -->
+  <script>
+
+    var authorizationEndpoint = "token.php";
+    // On document load resolve the Speech SDK dependency
+    function Initialize(onComplete) {
+      if (!!window.SpeechSDK) {
+        document.getElementById('content').style.display = 'block';
+        document.getElementById('warning').style.display = 'none';
+        onComplete(window.SpeechSDK);
+      }
+    }
+
+  </script>
+  <!-- Browser Hooks -->
+  <script>
+    var phraseDiv, statusDiv;
+    var key, authorizationToken, appId, phrases;
+    var regionOptions;
+    var languageOptions, formatOptions, inputSource, filePicker;
+    var SpeechSDK;
+    var recognizer;
+
+    var reco;
+    var sdkStartContinousRecognitionBtn, sdkStopContinousRecognitionBtn;
+    var sdkStartContinousTranslationBtn, sdkStopContinousTranslationBtn;
+    var sdkStartRecognizeOnceAsyncBtn, sdkStopRecognizeOnceAsyncBtn, languageTargetOptions, voiceOutput;
+    var sdkIntentStartRecognizeOnceAsyncBtn, sdkIntentStopRecognizeOnceAsyncBtn;
+    var audioFile, audioFileValid;
+
+    var soundContext = undefined;
+    try {
+      var AudioContext = window.AudioContext // our preferred impl
+        || window.webkitAudioContext       // fallback, mostly when on Safari
+        || false;                          // could not find.
+
+      if (AudioContext) {
+        soundContext = new AudioContext();
+      } else {
+        alert("Audio context not supported");
+      }
+    }
+    catch (e) {
+      window.console.log("no sound context found, no audio output. " + e);
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      //createBtn = document.getElementById("createBtn");
+      sdkStartRecognizeOnceAsyncBtn = document.getElementById("speechsdkStartRecognizeOnceAsync");
+      sdkStartContinousRecognitionBtn = document.getElementById("speechsdkStartContinuousRecognition");
+      sdkStopContinousRecognitionBtn = document.getElementById("speechsdkStopContinuousRecognition");
+      phraseDiv = document.getElementById("phraseDiv");
+      key = "d8b235e7fd2a4a8fa018fa9dee667549";
+      appId = "appId";
+      phrases = "";
+      languageOptions = "en-US";
+      languageTargetOptions = "Microsoft Server Speech Text to Speech Voice (de-DE, Hedda)";
+      voiceOutput = "true";
+      regionOptions = "westus";
+      formatOptions = "Simple";
+      inputSource = "Mic";
+
+      // Demonstrates recognizing a single spoken phrase.
+      sdkStartRecognizeOnceAsyncBtn.addEventListener("click", function () {
+        phraseDiv.value = "";
+        // If an audio file was specified, use it. Else use the microphone.
+        // Depending on browser security settings, the user may be prompted to allow microphone use. Using continuous recognition allows multiple
+        // phrases to be recognized from a single use authorization.
+        var audioConfig = audioFileValid ? SpeechSDK.AudioConfig.fromWavFileInput(audioFile) : SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+
+        var speechConfig;
+        if (authorizationToken) {
+          speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authorizationToken, regionOptions);
+        } else {
+          if (key === "" || key === "YOUR_SPEECH_API_KEY") {
+            alert("Please enter your Cognitive Services Speech subscription key!");
+            return;
+          }
+          speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, regionOptions);
+        }
+
+        speechConfig.speechRecognitionLanguage = languageOptions;
+        reco = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+        // If Phrase are specified, include them.
+        if (phrases !== "") {
+          var phraseListGrammar = SpeechSDK.PhraseListGrammar.fromRecognizer(reco);
+          phraseListGrammar.addPhrase(phrases.split(";"));
+        }
+
+        // Before beginning speech recognition, setup the callbacks to be invoked when an event occurs.
+
+        // The event recognizing signals that an intermediate recognition result is received.
+        // You will receive one or more recognizing events as a speech phrase is recognized, with each containing
+        // more recognized speech. The event will contain the text for the recognition since the last phrase was recognized.
+        reco.recognizing = function (s, e) {
+          window.console.log(e);
+          phraseDiv.value = e.result.text;
+        };
+
+        // The event signals that the service has stopped processing speech.
+        // https://docs.microsoft.com/javascript/api/microsoft-cognitiveservices-speech-sdk/speechrecognitioncanceledeventargs?view=azure-node-latest
+        // This can happen for two broad classes or reasons.
+        // 1. An error is encountered.
+        //    In this case the .errorDetails property will contain a textual representation of the error.
+        // 2. No additional audio is available.
+        //    Caused by the input stream being closed or reaching the end of an audio file.
+        reco.canceled = function (s, e) {
+          window.console.log(e);
+
+          if (e.reason === SpeechSDK.CancellationReason.Error) {
+          }
+
+        };
+
+        // The event recognized signals that a final recognition result is received.
+        // This is the final event that a phrase has been recognized.
+        // For continuous recognition, you will get one recognized event for each phrase recognized.
+        reco.recognized = function (s, e) {
+          window.console.log(e);
+
+          // Indicates that recognizable speech was not detected, and that recognition is done.
+          if (e.result.reason === SpeechSDK.ResultReason.NoMatch) {
+            var noMatchDetail = SpeechSDK.NoMatchDetails.fromResult(e.result);
+          } else {
+          }
+        };
+
+        // Signals that a new session has started with the speech service
+        reco.sessionStarted = function (s, e) {
+          window.console.log(e);
+        };
+
+        // Signals the end of a session with the speech service.
+        reco.sessionStopped = function (s, e) {
+          window.console.log(e);
+
+        };
+
+        // Signals that the speech service has started to detect speech.
+        reco.speechStartDetected = function (s, e) {
+          window.console.log(e);
+        };
+
+        // Signals that the speech service has detected that speech has stopped.
+        reco.speechEndDetected = function (s, e) {
+          window.console.log(e);
+        };
+
+        // Note: this is how you can process the result directly
+        //       rather then subscribing to the recognized
+        //       event
+        // The continuation below shows how to get the same data from the final result as you'd get from the
+        // events above.
+        reco.recognizeOnceAsync(
+          function (result) {
+            window.console.log(result);
+
+            switch (result.reason) {
+              case SpeechSDK.ResultReason.RecognizedSpeech:
+                //callSolrSearchajax(result.text);
+                GetResult();
+                break;
+              case SpeechSDK.ResultReason.NoMatch:
+                var noMatchDetail = SpeechSDK.NoMatchDetails.fromResult(result);
+                break;
+              case SpeechSDK.ResultReason.Canceled:
+                var cancelDetails = SpeechSDK.CancellationDetails.fromResult(result);
+
+                if (cancelDetails.reason === SpeechSDK.CancellationReason.Error) {
+                }
+                break;
+            }
+
+            phraseDiv.value = result.text.replace(".", "") + "\r\n";
+          },
+          function (err) {
+            window.console.log(err);
+
+            phraseDiv.value += "ERROR: " + err;
+          });
+
+        //sdkStartRecognizeOnceAsyncBtn.disabled = true;
+      });
+      Initialize(function (speechSdk) {
+        SpeechSDK = speechSdk;
+        sdkStartRecognizeOnceAsyncBtn.disabled = false;
+
+
+      });
+    });
+
+  </script>
+
+  <script>
+
+    function GetResult() {
+
+      var request = new XMLHttpRequest()
+
+      var txtFreeSearch = document.getElementById("phraseDiv").value;
+      document.getElementById('resultDiv11').innerHTML = "";
+      if (txtFreeSearch === "all") {
+        console.log("Inside All - " + txtFreeSearch);
+        txtFreeSearch = "";
+      }
+      console.log("Search Text - " + txtFreeSearch);
+      var query = `{
+                  search(fieldsEqual: [{name: "_fullpath", value: "/sitecore/content/sugcon-india/Content/BlogPostCollection/ContentListField/*"}]
+                  , keyword: "`+ txtFreeSearch + `") {
+                    results {
+                      items {
+                        item {
+                          id
+                          name
+                          path
+                          url
+                          ... on BlogPostItemTemplate {
+                            category {
+                              value
+                            }
+                            title {
+                              value
+                            }
+                            blogtagContentList {
+                              value
+                            }
+                            postDate {
+                              value
+                              formattedDateValue
+                            }
+                            abstractText {
+                              value
+                            }
+                            postImageSmall {
+                              value
+                              alt
+                              src
+                            }
+                            blogpostInternalLink {
+                              value
+                              id
+                              url
+                              text
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }`
+
+      var endpoint = 'http://sugncr-india.dev.local/sitecore/api/graph/mygraphapi?sc_apikey={20521F41-93F4-49E8-89A3-822972511111}&query=' + query;
+
+
+      //console.log('Query Fired - ' + endpoint);
+      request.open('GET', endpoint, true);
+      request.onload = function () {
+        // Begin accessing JSON data here
+        var data = JSON.parse(this.response);
+
+        //alert(data.data.search.results.items[0].name);
+        var resultString = "<h3>No Match. Try Again!!!</h3>";
+        if (request.status >= 200 && request.status < 400) {
+
+          resultString = "";
+
+          data.data.search.results.items.forEach(child => {
+            //console.log(child.item.name);
+            var imageURL = "http://sugncr-india.dev.local" + child.item.postImageSmall.src;
+            resultString += `<div class="blog-post-card card col-lg-4 col-md-6">
+                            <img class="card-img-top" style="width:350px" src=` + imageURL + ` alt="Card image cap"/>
+                            <div class="card-body bg-light">
+                                <strong class="d-inline-block mb-2 text-success">` + child.item.category.value + `</strong>
+                                <h3 class="card-title">`+ child.item.title.value + `</h3>
+                                <div class="mb-1 text-muted"`+ child.item.postDate.formattedDateValue + `></div>
+                                <p>` + child.item.abstractText.value + ` </p>
+                                <a href=` + child.item.blogpostInternalLink.url + ` class="btn btn-warning btn-block">` + child.item.blogpostInternalLink.text + `</a>
+                            </div>
+                      </div>`;
+            //console.log(resultString);
+          })
+        } else {
+          resultString = "<h3>Seems like something break. Try Again!!!</h3>";
+          console.log('error');
+        }
+
+        if (resultString === "") {
+          console.log("Blank result string");
+          resultString = "<h3>No Match. Try Again!!!</h3>";
+        }
+
+        var childRowDiv = document.createElement('div');
+        childRowDiv.id = "resultDiv";
+        childRowDiv.className = "row";
+        childRowDiv.innerHTML = resultString;
+        //childDiv = childDiv.firstChild;
+        document.getElementById('resultDiv11').appendChild(childRowDiv);
+
+      }
+
+      request.send();
+
+    }
+
+
+  </script>
+
+</body>
+
+</html>
